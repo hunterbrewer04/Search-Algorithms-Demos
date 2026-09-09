@@ -389,13 +389,54 @@ section('grid model', MODEL_BOARDS, () => {
   ok(m.cols === 30 && m.rows === 18, 'resize did not take');
   ok(m.wall.length === 30 * 18, 'resize did not resize the arrays');
 
-  // successor order is the reverse of the DFS push order
-  const p = SAD.gridProblem(openGrid(9, 9));
-  const mid = p.model.idx(4, 4);
+  // the surface js/worlds/grid.js codes against — renaming any of this breaks
+  // the grid world silently, so it is pinned here
+  const g = openGrid(9, 9);
+  for (const fn of ['idx','cx','cy','colOf','rowOf','neighbors','searchOrder','resize',
+                    'clear','reachable','randomWalls','randomTerrain','randomWeights','maze'])
+    ok(typeof g[fn] === 'function', `GridModel.${fn} is missing`);
+  ok(SAD.GridModel.HEAVY === 5, 'GridModel.HEAVY must be 5', `got ${SAD.GridModel.HEAVY}`);
+  ok(SAD.HEAVY === 5, 'SAD.HEAVY must be 5');
+  ok(Array.isArray(SAD.graphPresets), 'SAD.graphPresets must be predeclared as an array');
+  ok(typeof SAD.worldChanged === 'function', 'SAD.worldChanged must default to a no-op');
+  ok(Array.isArray(SAD.worlds), 'SAD.worlds must be an array');
+  const mid = g.idx(4, 4);
+  ok(g.colOf(mid) === g.cx(mid) && g.rowOf(mid) === g.cy(mid), 'colOf/rowOf must match cx/cy');
+  ok(g.wall.length === g.cols * g.rows && g.cost.length === g.cols * g.rows,
+     'wall/cost must be cols*rows long');
+  ok(g.idx(3, 5) === 5 * g.cols + 3, 'idx must be row * cols + col');
+
+  // registerWorld keeps SAD.worlds sorted by .order
+  const before = SAD.worlds.length;
+  SAD.registerWorld({ id:'__t3', order:3 });
+  SAD.registerWorld({ id:'__t1', order:1 });
+  const probe = SAD.worlds.slice(before).map(w => w.id);
+  ok(probe[0] === '__t1' && probe[1] === '__t3', 'registerWorld must sort by .order',
+     `got ${probe.join(',')}`);
+  ok(SAD.worldById('__t1') !== null, 'worldById must find a registered world');
+  SAD.worlds.length = before;
+
+  // neighbors is clockwise; successors is the reverse of the DFS push order
+  const nb = g.neighbors(mid);
+  ok(nb.length === 4, 'interior cell should have 4 neighbors');
+  ok(nb[0] === mid - 9 && nb[1] === mid + 1 && nb[2] === mid + 9 && nb[3] === mid - 1,
+     'GridModel.neighbors must be clockwise up, right, down, left', `got ${nb.join(',')}`);
+  g.wall[mid + 1] = 1;
+  ok(g.neighbors(mid).length === 4, 'GridModel.neighbors must not filter walls');
+  g.wall[mid + 1] = 0;
+
+  const p = SAD.gridProblem(g);
   const order = p.successors(mid).map(s => s.to);
   ok(order.length === 4, 'interior cell should have 4 successors');
   ok(order[0] === mid + 9 && order[1] === mid + 1 && order[2] === mid - 9 && order[3] === mid - 1,
-     'grid successors must be listed down, right, up, left');
+     'grid successors must be listed down, right, up, left', `got ${order.join(',')}`);
+  ok(p.undirected === true, 'gridProblem must report undirected true');
+  ok(p.label(g.idx(3, 5)) === '(5,3)', 'gridProblem.label must be "(row,col)"', `got ${p.label(g.idx(3,5))}`);
+
+  // step cost is the cost of the cell being entered
+  g.cost[mid + 1] = SAD.GridModel.HEAVY;
+  const e = SAD.gridProblem(g).successors(mid).find(s => s.to === mid + 1);
+  ok(e && e.cost === SAD.GridModel.HEAVY, 'successor cost must be cost[to]', `got ${e && e.cost}`);
 });
 
 /* ---------------------------------------------------------------

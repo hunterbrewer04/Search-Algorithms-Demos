@@ -20,14 +20,14 @@
 
       successors(n){
         const out = [];
-        for (const v of m.neighbors(n)) if (!m.wall[v]) out.push({ to: v, cost: m.cost[v] });
+        for (const v of m.searchOrder(n)) if (!m.wall[v]) out.push({ to: v, cost: m.cost[v] });
         return out;
       },
 
       predecessors(n){
         const out = [];
         const c = m.cost[n];
-        for (const v of m.neighbors(n)) if (!m.wall[v]) out.push({ from: v, cost: c });
+        for (const v of m.searchOrder(n)) if (!m.wall[v]) out.push({ from: v, cost: c });
         return out;
       },
 

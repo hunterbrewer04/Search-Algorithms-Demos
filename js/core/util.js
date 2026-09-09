@@ -67,6 +67,9 @@
     return SAD.worlds.find(w => w.id === id) || null;
   };
 
+  /* js/data/presets.js pushes into this; predeclared so it can load in any order */
+  SAD.graphPresets = SAD.graphPresets || [];
+
   /* the app replaces this; the default keeps a world from throwing if it edits
      itself before the app has booted */
   SAD.worldChanged = SAD.worldChanged || function () {};

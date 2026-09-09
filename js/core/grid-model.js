@@ -17,11 +17,25 @@
     idx(c, r){ return r * this.cols + c; }
     cx(i){ return i % this.cols; }
     cy(i){ return (i / this.cols) | 0; }
+    colOf(i){ return i % this.cols; }
+    rowOf(i){ return (i / this.cols) | 0; }
     get size(){ return this.cols * this.rows; }
 
-    /* down, right, up, left — the reverse of the order a stack-based search
-       pushes them in, so DFS pops down first, then right. */
+    /* clockwise: up, right, down, left. Walls are not filtered — this is the
+       geometric neighbourhood, for rendering, editing and reachability. */
     neighbors(i){
+      const c = i % this.cols, r = (i / this.cols) | 0, out = [];
+      if (r > 0)             out.push(i - this.cols);
+      if (c < this.cols - 1) out.push(i + 1);
+      if (r < this.rows - 1) out.push(i + this.cols);
+      if (c > 0)             out.push(i - 1);
+      return out;
+    }
+
+    /* down, right, up, left — the order gridProblem lists successors in. A
+       stack-based search pushes successors in reverse, which puts them on the
+       stack as left, up, right, down and pops down first, then right. */
+    searchOrder(i){
       const c = i % this.cols, r = (i / this.cols) | 0, out = [];
       if (r < this.rows - 1) out.push(i + this.cols);
       if (c < this.cols - 1) out.push(i + 1);
@@ -103,6 +117,8 @@
       return this;
     }
 
+    randomWeights(){ return this.randomTerrain(); }
+
     /* Recursive division. Walls land on even coordinates and gaps on odd ones,
        and every region is odd-to-odd; that parity is what keeps the maze
        connected, so leave it alone. */
@@ -154,6 +170,7 @@
     }
   }
 
+  GridModel.HEAVY = HEAVY;
   SAD.GridModel = GridModel;
 
 })(typeof globalThis !== 'undefined' ? globalThis : window);
