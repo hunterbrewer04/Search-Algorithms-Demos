@@ -414,6 +414,8 @@ section('grid model', MODEL_BOARDS, () => {
   ok(probe[0] === '__t1' && probe[1] === '__t3', 'registerWorld must sort by .order',
      `got ${probe.join(',')}`);
   ok(SAD.worldById('__t1') !== null, 'worldById must find a registered world');
+  ok(typeof SAD.worldOf === 'function', 'SAD.worldOf is missing');
+  ok(SAD.worldOf('__t3') === SAD.worldById('__t3'), 'worldOf must be an alias of worldById');
   SAD.worlds.length = before;
 
   // neighbors is clockwise; successors is the reverse of the DFS push order

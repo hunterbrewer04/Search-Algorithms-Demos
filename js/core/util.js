@@ -66,6 +66,8 @@
   SAD.worldById = SAD.worldById || function (id) {
     return SAD.worlds.find(w => w.id === id) || null;
   };
+  /* contract addendum 1 name; delegates so it survives worldById being replaced */
+  SAD.worldOf = SAD.worldOf || function (id) { return SAD.worldById(id); };
 
   /* js/data/presets.js pushes into this; predeclared so it can load in any order */
   SAD.graphPresets = SAD.graphPresets || [];
