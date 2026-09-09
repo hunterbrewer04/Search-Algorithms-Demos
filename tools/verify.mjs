@@ -674,8 +674,50 @@ section('unreachable goals', 12, () => {
 /* ---------------------------------------------------------------
    7. depth-limited search
    --------------------------------------------------------------- */
-section('depth limits', have('dls') ? 12 : 0, () => {
+section('depth limits', have('dls') ? 60 : 0, () => {
   if (!have('dls')){ notes.push('dls absent — depth-limit cases skipped'); return; }
+
+  // Completeness for the limit: with L at or above the shallowest goal, DLS has
+  // to find one. Iterative deepening delegates here and its fewest-edges
+  // guarantee is exactly this property, one round at a time — so a DLS that
+  // expands a state at a deep depth and never revisits it shallower breaks
+  // IDDFS rather than DLS, and does it quietly.
+  const comp = [];
+  for (let i = 0; i < 20; i++)
+    comp.push({ where: `dls graph #${i}`, p: SAD.graphProblem(randomGraph('unit', 6, 14)) });
+  for (let i = 0; i < 20; i++){
+    const g = openGrid(randInt(8, 16), randInt(6, 12));
+    g.randomWalls();                                  // unweighted, so d* is edge count
+    comp.push({ where: `dls grid #${i}`, p: SAD.gridProblem(g), m: g });
+  }
+  for (const c of comp){
+    const d = fewestEdges(c.p);
+    if (!ok(d !== null && d >= 1, `${c.where}: degenerate board`)) continue;
+    for (const L of [d, d + 1, d + 4]){
+      const r = solve(A('dls'), c.p, { limit: L }, `${c.where} L=${L}`, c.m);
+      if (!ok(r && r.found,
+              `${c.where}: DLS found nothing at limit ${L} with the shallowest goal at depth ${d}`)) continue;
+      ok(r.len <= L, `${c.where}: DLS path deeper than its limit`, `limit ${L}, depth ${r.len}`);
+    }
+  }
+
+  // same property with no explored set at all; small problems, since tree search
+  // enumerates simple paths
+  for (let i = 0; i < 8; i++){
+    const p = SAD.graphProblem(randomGraph('unit', 6, 11));
+    const d = fewestEdges(p);
+    if (d === null || d < 1) continue;
+    const r = solve(A('dls'), p, { limit: d, search: 'tree', maxExpansions: 200000 },
+                    `dls tree #${i}`);
+    ok(r && r.found, `dls tree #${i}: DLS found nothing at limit ${d} in tree mode`);
+  }
+
+  // a cap failure must not also claim cutoff, or iddfs reads it as "go deeper"
+  const capg = SAD.graphProblem(randomGraph('unit', 10, 14));
+  const capped = drive(A('dls'), capg, { limit: 40, search: 'tree', maxExpansions: 5 }, 100000);
+  if (!capped.error && capped.last.kind === 'fail' && capped.last.note === 'cap')
+    ok(capped.last.cutoff !== true, "a fail with note 'cap' must not also set cutoff");
+
   for (let i = 0; i < 12; i++){
     const m = i % 2 ? weightedGrid() : mazeGrid();
     const p = SAD.gridProblem(m);

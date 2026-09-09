@@ -118,8 +118,21 @@
     const o = opt(opts);
     const L = limited ? o.limit : Infinity;
     const tree = o.search === 'tree';
-    const explored = tree ? null : new Set();
+    const explored = tree ? null : new Map();   // state -> shallowest depth expanded
     const root = mk(problem.start, null, 0, 0);
+
+    /* A depth limit makes the explored set depth-sensitive. Expanding a state
+       once at a deep depth and never looking at it again can hide a goal that
+       does sit within the limit, reachable through that state by a shallower
+       route — which costs iterative deepening its shallowest-goal guarantee.
+       So DLS re-expands a state that turns up strictly shallower than the depth
+       it was expanded at. Plain DFS has no such guarantee to keep and stays
+       seen-once. */
+    const blocked = (state, depth) => {
+      const at = explored.get(state);
+      if (at === undefined) return false;
+      return limited ? at <= depth : true;
+    };
     const stack = [root];
     let cut = false, expansions = 0;
 
@@ -128,7 +141,7 @@
       for (let i = stack.length - 1; i >= 0; i--){
         const n = stack[i];
         if (seen){
-          if (explored.has(n.state) || seen.has(n.state)) continue;
+          if (blocked(n.state, n.depth) || seen.has(n.state)) continue;
           seen.add(n.state);
         }
         out.push(ent(n));
@@ -147,17 +160,17 @@
 
     while (stack.length){
       if (expansions >= o.maxExpansions){
-        yield { kind:'fail', note:'cap', cutoff:cut, fsize:fsize(), frontier:view };
+        yield { kind:'fail', note:'cap', fsize:fsize(), frontier:view };
         return;
       }
       const cur = stack.pop();
 
-      if (explored && explored.has(cur.state)){
+      if (explored && blocked(cur.state, cur.depth)){
         yield { kind:'stale', id:cur.state, g:cur.g, h:0, f:cur.g, depth:cur.depth,
                 fsize:fsize(), frontier:view };
         continue;
       }
-      if (explored) explored.add(cur.state);
+      if (explored) explored.set(cur.state, cur.depth);
 
       if (o.goalTest === 'pop' && problem.isGoal(cur.state)){
         yield { kind:'goal', id:cur.state, g:cur.g, h:0, f:cur.g, depth:cur.depth,
@@ -179,7 +192,7 @@
         const s = succ[k];
         if (tree){
           if (onPath(cur, s.to)) continue;
-        } else if (explored.has(s.to)) continue;
+        } else if (blocked(s.to, cur.depth + 1)) continue;
 
         const ch = mk(s.to, cur, cur.g + s.cost, cur.depth + 1);
         stack.push(ch);
@@ -379,15 +392,15 @@ cutoff_hit ← false
 
 while frontier is not empty:
     (node, depth) ← frontier.POP_TOP()
-    if node in explored: continue
-    explored.ADD(node)
+    if explored[node] ≤ depth: continue   # already expanded this shallow
+    explored[node] ← depth                # re-expand if seen deeper before
     if node is GOAL:
         return SOLUTION(node)
     if depth = L:                        # cut off, do not expand
         cutoff_hit ← true
         continue
     for each child of EXPAND(node):
-        if child not in explored:
+        if explored[child] > depth + 1:
             frontier.PUSH_TOP((child, depth + 1))
 
 return CUTOFF if cutoff_hit else FAILURE
