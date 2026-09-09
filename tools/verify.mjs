@@ -176,8 +176,18 @@ function drive(entry, problem, opts, budget, strictG){
       }
     }
     if (s.kind === 'init'){
-      if (!Array.isArray(s.pushed) || s.pushed.length !== 1) shape.push('init must push exactly the root');
-      else if (s.pushed[0].parent !== null) shape.push('init root must have parent null');
+      const roots = s.pushed;
+      if (!Array.isArray(roots) || roots.length < 1) shape.push('init must push at least one root');
+      else if (roots.some(r => r.parent !== null)) shape.push('every init root must have parent null');
+      else if (entry.id === 'bidirectional'){
+        // genuinely two roots: one frontier grows from the start, one from the goal
+        if (roots.length !== 2)
+          shape.push(`bidirectional init must push two roots, got ${roots.length}`);
+        else if (!roots.some(r => r.id === problem.start) || !roots.some(r => problem.isGoal(r.id)))
+          shape.push('bidirectional init roots must be the start and the goal');
+      }
+      else if (roots.length !== 1) shape.push('init must push exactly the root');
+      else if (roots[0].id !== problem.start) shape.push('init root must be the problem start');
     }
     if (s.kind === 'goal' && !Array.isArray(s.path)) shape.push('goal step carries no path array');
     if ((steps % 25 === 0) && typeof s.frontier === 'function'){
