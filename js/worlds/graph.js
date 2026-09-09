@@ -411,6 +411,7 @@ function bindGestures(){
 const STATES = ['is-frontier', 'is-visited', 'is-cutoff', 'is-path'];
 const RANK = { 'is-frontier':1, 'is-visited':2, 'is-cutoff':3, 'is-path':4 };
 let shown = [];
+let meetAt = null;
 
 function rankOf(g){
   let r = 0;
@@ -485,6 +486,7 @@ function clearSearch(){
   for (const e of edges.values()) e.line.classList.remove('is-tree', 'is-path');
   sawH = false;
   shown = [];
+  meetAt = null;
   pathLine.style.transition = 'none';
   pathLine.style.opacity = 0;
   pathLine.removeAttribute('d');
@@ -553,8 +555,8 @@ function resolvePreset(arg){
 }
 
 function load(preset){
-  SAD.activePreset = preset;
   model = (typeof preset.generate === 'function') ? preset.generate() : preset;
+  SAD.activePreset = model;
   build();
   clearSearch();
   fit();
@@ -618,8 +620,14 @@ SAD.registerWorld({
         break;
 
       case 'meet': {
+        // fires again on every better meeting, so the ring marks the current best
+        // rather than accumulating a trail of superseded ones
+        if (meetAt != null && meetAt !== step.id){
+          const prev = nodes.get(meetAt);
+          if (prev) prev.g.classList.remove('is-meet');
+        }
         const n = nodes.get(step.id);
-        if (n) n.g.classList.add('is-meet');   // additive: the run continues past the first touch
+        if (n){ n.g.classList.add('is-meet'); meetAt = step.id; }
         setVals(step.id, step);
         break;
       }
