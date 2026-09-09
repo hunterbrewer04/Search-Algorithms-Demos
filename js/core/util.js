@@ -36,10 +36,20 @@
   SAD.HEAVY = 5;
 
   /* Picker order. Files register in whatever order the page loads them, so the
-     list is kept sorted by the order each entry declares for itself. An entry
-     with no order sorts last, keeping its arrival position; verify.mjs fails on
-     a missing order rather than letting the picker quietly scramble. */
-  const rank = entry => typeof entry.order === 'number' ? entry.order : Infinity;
+     list is kept sorted rather than left in arrival order.
+
+     An entry declares its own position with `order`, which is the mechanism
+     that matters: a file owns where its own algorithms sit. The id list below
+     is only a safety net for an entry that has not declared one yet, so the
+     picker degrades to the documented order instead of scrambling. It is not a
+     claim on those ids — verify.mjs still fails on any entry missing `order`,
+     so the net catches a page mid-build without letting one ship that way. */
+  const ALGO_ORDER = ['bfs','dfs','dls','iddfs','ucs','greedy','astar','bidirectional'];
+  const rank = entry => {
+    if (typeof entry.order === 'number') return entry.order;
+    const i = ALGO_ORDER.indexOf(entry.id);
+    return i < 0 ? 999 : i + 1;
+  };
 
   SAD.algorithms = SAD.algorithms || [];
   SAD.registerAlgorithm = SAD.registerAlgorithm || function (entry) {
