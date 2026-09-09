@@ -46,6 +46,20 @@
   const activeWorld = () => worldById(UI.world);
   const entry = () => SAD.algorithmById(UI.algo);
 
+  function currentOpts(){
+    return { limit: UI.limit, goalTest: UI.goalTest, search: UI.search, maxExpansions: MAX_EXPANSIONS };
+  }
+
+  /* Worlds need to know which algorithm is running to label their nodes and to
+     decide whether a depth cut line applies. Publish it rather than making them
+     read it back out of the rendered card. */
+  function publishAlgorithm(){
+    SAD.currentAlgorithm = entry() || null;
+    SAD.currentOpts = currentOpts();
+    for (const w of worlds())
+      if (typeof w.setAlgorithm === 'function') w.setAlgorithm(SAD.currentAlgorithm, SAD.currentOpts);
+  }
+
   function getProblem(){
     if (!problemCache) problemCache = activeWorld().problem();
     return problemCache;
@@ -86,12 +100,8 @@
     resetRun();
     const p = sim.problem = getProblem();
     SAD.panels.labelFor = n => p.label(n);
-    sim.gen = entry().make(p, {
-      limit: UI.limit,
-      goalTest: UI.goalTest,
-      search: UI.search,
-      maxExpansions: MAX_EXPANSIONS
-    });
+    publishAlgorithm();
+    sim.gen = entry().make(p, SAD.currentOpts);
     sim.started = true;
     sim.status = 'Running';
   }
@@ -141,9 +151,10 @@
         break;
 
       case 'restart':
-        // IDDFS opening its next round. Everything drawn goes; the counters stay,
-        // because the re-expansion is the whole point of iterative deepening.
-        sim.status = `L = ${v.iteration}`;
+        // IDDFS opening its next round. Every visual goes; `expanded` and `peak`
+        // stay cumulative, because the total work summed over the rounds is the
+        // whole cost argument for iterative deepening.
+        sim.status = `Round L = ${v.iteration}`;
         sim.fsize = 0;
         for (const w of worlds()) w.reset();
         SAD.panels.log('info', `restart — depth limit L = ${v.iteration}${tail}`);
@@ -276,6 +287,7 @@
     problemCache = null;            // the next run comes from this world
     if (!w.supportsRace && UI.mode === 'race') setMode('explore');
     w.activate();
+    if (typeof w.setAlgorithm === 'function') w.setAlgorithm(SAD.currentAlgorithm || null, SAD.currentOpts || currentOpts());
     syncWorldControls();
     buildAlgoTabs();                // undirectedOnly support can differ per world
   }
@@ -327,7 +339,7 @@
       const pills = document.createElement('div');
       pills.className = 'pillrow';
       for (const e of inGroup){
-        const n = list.indexOf(e) + 1;        // matches the 1-8 number-key shortcuts
+        const n = e.order;                    // declared, so the key is stable on a partial merge
         const b = document.createElement('button');
         b.className = 'pill' + (e.id === UI.algo ? ' on' : '');
         b.dataset.k = e.id;
@@ -355,6 +367,7 @@
     for (const b of $('algoTabs').querySelectorAll('.pill'))
       b.classList.toggle('on', b.dataset.k === id);
     SAD.panels.setAlgorithm(e);
+    publishAlgorithm();
     const wantsLimit = !!(e.supports && e.supports.limit);
     $('limitWrap').classList.toggle('off', !wantsLimit);
     $('limitDiv').classList.toggle('off', !wantsLimit);
@@ -372,6 +385,7 @@
         UI[key] = b.dataset.v;
         for (const x of seg.children) x.classList.toggle('on', x === b);
         $(noteId).textContent = notes[UI[key]];
+        publishAlgorithm();
         // The rules cannot change halfway through a search, so the run restarts.
         if (UI.mode === 'race') resetRace(); else resetRun();
       };
@@ -498,7 +512,7 @@
     race.view = gw.raceView();
     const n = race.view.cols * race.view.rows;
     const p = race.problem = getProblem();
-    const opts = { limit:UI.limit, goalTest:UI.goalTest, search:UI.search, maxExpansions:MAX_EXPANSIONS };
+    const opts = currentOpts();
     for (const e of race.entries){
       e.state = new Uint8Array(n);
       e.gen = e.algo.make(p, opts);
@@ -716,6 +730,7 @@
     $('limit').oninput = e => {
       UI.limit = +e.target.value;
       $('limitVal').textContent = UI.limit;
+      publishAlgorithm();
       const e2 = entry();
       if (e2 && e2.supports && e2.supports.limit){
         if (UI.mode === 'race') resetRace(); else resetRun();
@@ -759,7 +774,7 @@
       else if (e.key === 'c'){ $('btnClear').click(); }
       else if (e.key >= '1' && e.key <= '8'){
         if (UI.mode !== 'explore') return;
-        const pick = algoList()[+e.key - 1];
+        const pick = algoList().find(a => a.order === +e.key);
         if (pick && !disabledReason(pick)) selectAlgo(pick.id);
       }
     });
