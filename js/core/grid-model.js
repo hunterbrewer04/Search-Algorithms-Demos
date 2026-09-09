@@ -44,17 +44,24 @@
       return out;
     }
 
-    /* keeps whatever terrain overlaps the new bounds */
+    /* Keeps whatever terrain overlaps the new bounds, and carries start and goal
+       across proportionally. This fires on every device rotation, so re-placing
+       the markers would throw away wherever the user dragged them; they only get
+       re-placed when the cell they land on is unusable. */
     resize(cols, rows){
       cols = Math.max(2, cols | 0);
       rows = Math.max(2, rows | 0);
       const oldW = this.wall, oldC = this.cost, oc = this.cols, or_ = this.rows;
+      const had = !!(oldW && oc && or_);
+      const sc0 = had ? this.start % oc : 0, sr0 = had ? (this.start / oc) | 0 : 0;
+      const gc0 = had ? this.goal  % oc : 0, gr0 = had ? (this.goal  / oc) | 0 : 0;
+
       this.cols = cols; this.rows = rows;
       const n = cols * rows;
       this.wall = new Uint8Array(n);
       this.cost = new Uint8Array(n).fill(1);
 
-      if (oldW && oc && or_){
+      if (had){
         for (let r = 0; r < Math.min(rows, or_); r++)
           for (let c = 0; c < Math.min(cols, oc); c++){
             this.wall[r*cols+c] = oldW[r*oc+c];
@@ -63,12 +70,28 @@
       }
 
       const mid = Math.min(rows - 1, Math.round(rows / 2));
-      const sc = Math.min(cols - 1, Math.max(1, Math.round(cols * 0.13)));
-      const gc = Math.max(0, Math.min(cols - 2, Math.round(cols * 0.87)));
-      this.start = this.idx(sc, mid);
-      this.goal  = this.idx(gc, mid);
-      if (this.goal === this.start) this.goal = this.idx(cols - 1, mid);
-      if (this.goal === this.start) this.goal = this.idx(cols - 1, rows - 1);
+      const dStart = this.idx(Math.min(cols - 1, Math.max(1, Math.round(cols * 0.13))), mid);
+      const dGoal  = this.idx(Math.max(0, Math.min(cols - 2, Math.round(cols * 0.87))), mid);
+
+      // same fractional position in the new bounds
+      const scale = (v, from, to) =>
+        from <= 1 ? 0 : Math.max(0, Math.min(to - 1, Math.round(v * (to - 1) / (from - 1))));
+      const free = (i, avoid) => i >= 0 && i < n && !this.wall[i] && i !== avoid;
+      const nearestFree = (i, avoid) => {
+        for (let d = 0; d < n; d++){
+          if (free(i + d, avoid)) return i + d;
+          if (free(i - d, avoid)) return i - d;
+        }
+        return i === avoid ? (i + 1) % n : i;
+      };
+      const place = (moved, fallback, avoid) => {
+        if (had && free(moved, avoid)) return moved;
+        if (free(fallback, avoid)) return fallback;
+        return nearestFree(fallback, avoid);
+      };
+
+      this.start = place(this.idx(scale(sc0, oc, cols), scale(sr0, or_, rows)), dStart, -1);
+      this.goal  = place(this.idx(scale(gc0, oc, cols), scale(gr0, or_, rows)), dGoal, this.start);
       this.wall[this.start] = 0; this.wall[this.goal] = 0;
       return this;
     }

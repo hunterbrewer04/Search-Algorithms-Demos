@@ -333,6 +333,28 @@ section('wrapper + registry', () => present.length, () => {
   ok(got.join(',') === expected.join(','), 'algorithms are not in contract order',
      `expected ${expected.join(',')} — got ${got.join(',')}`);
 
+  // every entry carries an explicit order, and the list is sorted by it
+  const ORDERS = { bfs:1, dfs:2, dls:3, iddfs:4, ucs:5, greedy:6, astar:7, bidirectional:8 };
+  for (const a of SAD.algorithms){
+    ok(typeof a.order === 'number', `registry '${a.id}': no numeric order`);
+    if (ORDERS[a.id] !== undefined)
+      ok(a.order === ORDERS[a.id], `registry '${a.id}': order must be ${ORDERS[a.id]}`, `got ${a.order}`);
+  }
+  for (let i = 1; i < SAD.algorithms.length; i++)
+    ok(SAD.algorithms[i - 1].order <= SAD.algorithms[i].order,
+       'SAD.algorithms is not sorted by order',
+       `${SAD.algorithms[i-1].id}=${SAD.algorithms[i-1].order} before ${SAD.algorithms[i].id}=${SAD.algorithms[i].order}`);
+
+  // a late registration must land in its slot, not at the end
+  SAD.registerAlgorithm({ id:'__probe', order:4, name:'probe', short:'p', group:'uninformed',
+    desc:'x', complete:['yes','y'], optimal:['yes','y'], time:'t', space:'s',
+    frontierLabel:'f', frontierKeys:[], code:'a\nb', supports:{}, make(){ } });
+  const after = SAD.algorithms.map(a => a.id);
+  const slot = after.indexOf('__probe');
+  ok(slot > after.indexOf('dls') && (after.indexOf('ucs') < 0 || slot < after.indexOf('ucs')),
+     'a late registration did not land in its order slot', `got ${after.join(',')}`);
+  SAD.algorithms.splice(slot, 1);
+
   for (const a of SAD.algorithms){
     const where = `registry '${a.id}'`;
     ok(typeof a.name === 'string' && a.name.length > 0, `${where}: no name`);
@@ -388,6 +410,51 @@ section('grid model', MODEL_BOARDS, () => {
   ok(m.cost[m.idx(5, 6)] === SAD.HEAVY, 'resize dropped terrain inside the old bounds');
   ok(m.cols === 30 && m.rows === 18, 'resize did not take');
   ok(m.wall.length === 30 * 18, 'resize did not resize the arrays');
+
+  // resize fires on every device rotation, so dragged markers must survive it
+  const frac = (v, n) => n <= 1 ? 0 : v / (n - 1);
+  const rot = openGrid(20, 12);
+  rot.start = rot.idx(2, 3);
+  rot.goal  = rot.idx(17, 9);
+  const sf = [frac(2, 20), frac(3, 12)], gf = [frac(17, 20), frac(9, 12)];
+  rot.resize(12, 20);                                   // portrait
+  ok(rot.start !== rot.idx(Math.round(12 * 0.13), 10),
+     'resize re-placed start instead of carrying it across');
+  for (const [who, want] of [['start', sf], ['goal', gf]]){
+    const i = rot[who];
+    const dc = Math.abs(frac(rot.colOf(i), rot.cols) - want[0]);
+    const dr = Math.abs(frac(rot.rowOf(i), rot.rows) - want[1]);
+    ok(dc <= 0.06 && dr <= 0.06, `resize moved ${who} off its fractional position`,
+       `drift ${dc.toFixed(3)}, ${dr.toFixed(3)}`);
+  }
+
+  // a marker that lands on a wall gets re-placed, never punched through
+  const wallCase = openGrid(20, 12);
+  wallCase.start = wallCase.idx(2, 3);
+  wallCase.resize(40, 24);
+  const landed = wallCase.idx(wallCase.colOf(wallCase.start), wallCase.rowOf(wallCase.start));
+  wallCase.resize(20, 12);
+  wallCase.wall.fill(1);
+  wallCase.wall[wallCase.start] = 0;
+  wallCase.resize(40, 24);
+  ok(wallCase.wall[wallCase.start] === 0 && wallCase.wall[wallCase.goal] === 0,
+     'resize left start or goal sitting on a wall');
+  ok(wallCase.start !== wallCase.goal, 'resize collapsed start onto goal');
+  ok(landed >= 0, 'resize produced an out-of-bounds start');
+
+  // hammer it: repeated rotations must never corrupt the markers
+  const spin = openGrid(24, 16);
+  spin.randomTerrain();
+  spin.randomWalls();
+  for (let k = 0; k < 40; k++){
+    spin.resize(randInt(6, 40), randInt(5, 30));
+    const bad = spin.start === spin.goal
+      || spin.start < 0 || spin.start >= spin.size
+      || spin.goal  < 0 || spin.goal  >= spin.size
+      || spin.wall[spin.start] || spin.wall[spin.goal];
+    if (!ok(!bad, `resize round ${k} corrupted start/goal`,
+            `${spin.cols}x${spin.rows} start=${spin.start} goal=${spin.goal}`)) break;
+  }
 
   // the surface js/worlds/grid.js codes against — renaming any of this breaks
   // the grid world silently, so it is pinned here

@@ -308,7 +308,7 @@
   const reg = SAD.registerAlgorithm;
 
   reg({
-    id:'bfs', name:'Breadth-First Search', short:'BFS', group:'uninformed',
+    id:'bfs', order:1, name:'Breadth-First Search', short:'BFS', group:'uninformed',
     desc:'Expands the shallowest node in the frontier. The frontier is a FIFO queue, so nodes leave in exactly the order they arrived and the search sweeps outward in even rings from the start.',
     complete: ['yes','Yes'],
     optimal:  ['maybe','Only when every step costs the same'],
@@ -335,7 +335,7 @@ return FAILURE
   });
 
   reg({
-    id:'dfs', name:'Depth-First Search', short:'DFS', group:'uninformed',
+    id:'dfs', order:2, name:'Depth-First Search', short:'DFS', group:'uninformed',
     desc:'Expands the deepest node in the frontier. The frontier is a LIFO stack, so the newest child comes out first and the search dives down one corridor until it dead-ends before backing up.',
     complete: ['maybe','Yes on a finite graph with an explored set'],
     optimal:  ['no','No — returns the first path found'],
@@ -363,7 +363,7 @@ return FAILURE
   });
 
   reg({
-    id:'dls', name:'Depth-Limited Search', short:'DLS', group:'uninformed',
+    id:'dls', order:3, name:'Depth-Limited Search', short:'DLS', group:'uninformed',
     desc:'DFS that refuses to look past depth L. Nodes at the limit are cut off and their children are never generated, which bounds time and memory — but the goal is unreachable if it sits deeper than L. Run it with growing L and you get iterative deepening.',
     complete: ['maybe','Only if L ≥ depth of the shallowest goal'],
     optimal:  ['no','No'],
@@ -395,7 +395,7 @@ return CUTOFF if cutoff_hit else FAILURE
   });
 
   reg({
-    id:'ucs', name:'Uniform-Cost Search', short:'UCS', group:'uninformed',
+    id:'ucs', order:5, name:'Uniform-Cost Search', short:'UCS', group:'uninformed',
     desc:'Expands the node with the lowest path cost g(n) so far. The frontier is a priority queue keyed on g, which makes this Dijkstra’s algorithm: it grows a cost contour outward and is optimal for any non-negative step costs.',
     complete: ['yes','Yes, when every step cost is > 0'],
     optimal:  ['yes','Yes'],
@@ -426,7 +426,7 @@ return FAILURE
   });
 
   reg({
-    id:'greedy', name:'Greedy Best-First Search', short:'Greedy', group:'informed',
+    id:'greedy', order:6, name:'Greedy Best-First Search', short:'Greedy', group:'informed',
     desc:'Expands whichever node looks closest to the goal, ordering the frontier on h(n) alone and throwing away the g(n) already spent. It drives at the goal hard and usually gets there after very few expansions, but it takes the first path it stumbles into and will happily walk a long way around an obstacle that only looked like a shortcut. A* is this same loop with g added back, which is exactly what buys the optimality back.',
     complete: ['maybe','Yes on a finite graph with an explored set'],
     optimal:  ['no','No — ignores the cost already paid'],
@@ -458,7 +458,7 @@ return FAILURE
   });
 
   reg({
-    id:'astar', name:'A* Search', short:'A*', group:'informed',
+    id:'astar', order:7, name:'A* Search', short:'A*', group:'informed',
     desc:'Expands the node with the lowest f(n) = g(n) + h(n), where h is the Manhattan distance to the goal. Because h never overestimates the true remaining cost, A* returns an optimal path while pulling the search toward the goal instead of spreading evenly like UCS.',
     complete: ['yes','Yes'],
     optimal:  ['yes','Yes — h is admissible and consistent'],

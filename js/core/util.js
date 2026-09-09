@@ -36,18 +36,21 @@
   SAD.HEAVY = 5;
 
   /* Picker order. Files register in whatever order the page loads them, so the
-     list is kept sorted by this instead of by arrival. Unknown ids go last. */
+     list is kept sorted by entry.order instead of by arrival. An entry with no
+     order falls back to its slot in the canonical list, and anything unknown
+     goes last. */
   const ALGO_ORDER = ['bfs','dfs','dls','iddfs','ucs','greedy','astar','bidirectional'];
-  const rank = id => {
-    const i = ALGO_ORDER.indexOf(id);
-    return i < 0 ? ALGO_ORDER.length : i;
+  const rank = entry => {
+    if (typeof entry.order === 'number') return entry.order;
+    const i = ALGO_ORDER.indexOf(entry.id);
+    return i < 0 ? 999 : i + 1;
   };
 
   SAD.algorithms = SAD.algorithms || [];
   SAD.registerAlgorithm = SAD.registerAlgorithm || function (entry) {
     const at = SAD.algorithms.findIndex(a => a.id === entry.id);
     if (at >= 0) SAD.algorithms[at] = entry; else SAD.algorithms.push(entry);
-    SAD.algorithms.sort((a, b) => rank(a.id) - rank(b.id));
+    SAD.algorithms.sort((a, b) => rank(a) - rank(b));
     return entry;
   };
   SAD.algorithmById = SAD.algorithmById || function (id) {
