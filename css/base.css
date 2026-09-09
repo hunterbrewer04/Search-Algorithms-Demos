@@ -1,0 +1,306 @@
+/* Design tokens, shell chrome, panels and footer controls.
+   Every world file styles itself with these tokens and never redefines them. */
+
+:root{
+  --bg:#080a0f;
+  --bg2:#0d1017;
+  --panel:rgba(255,255,255,.028);
+  --panel2:rgba(255,255,255,.05);
+  --line:rgba(255,255,255,.075);
+  --line2:rgba(255,255,255,.13);
+  --text:#e8ebf3;
+  --dim:#98a1b8;
+  --dim2:#6b748c;
+
+  --cell:#161a25;
+  --wall:#04060b;
+  --frontier:#22d3ee;
+  --visited:rgba(129,140,248,.30);
+  --visited-hi:#8b5cf6;
+  --cutoff:rgba(248,113,113,.26);
+  --path:#fbbf24;
+  --start:#10b981;
+  --goal:#f43f5e;
+  --heavy:rgba(251,191,36,.10);
+
+  --gap:2px;
+  --cs:22px;
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(1100px 600px at 12% -8%, rgba(99,102,241,.14), transparent 62%),
+    radial-gradient(900px 520px at 92% 8%, rgba(34,211,238,.10), transparent 60%),
+    radial-gradient(800px 600px at 60% 108%, rgba(251,191,36,.05), transparent 60%),
+    var(--bg);
+  color:var(--text);
+  font-family:ui-sans-serif,-apple-system,"SF Pro Text","Segoe UI",system-ui,Inter,sans-serif;
+  font-size:13px;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button,input,select{font:inherit;color:inherit}
+::selection{background:rgba(34,211,238,.3)}
+
+/* ---------- shell ---------- */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding:14px;gap:12px}
+
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{
+  font-size:16px;font-weight:650;letter-spacing:-.015em;white-space:nowrap;
+  background:linear-gradient(92deg,#e8ebf3,#a5b4fc 42%,#67e8f9);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.brand small{color:var(--dim2);font-size:11.5px;white-space:nowrap}
+.spacer{flex:1}
+
+.seg{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.025)}
+.seg button{
+  border:0;background:transparent;color:var(--dim);padding:6px 13px;border-radius:8px;
+  font-size:12px;font-weight:550;cursor:pointer;transition:.16s;letter-spacing:.01em;
+}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:rgba(255,255,255,.10);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.09) inset}
+.seg.sm button{padding:4px 10px;font-size:11px;font-weight:500}
+.seg.off{display:none}
+
+/* ---------- algorithm picker ---------- */
+/* Eight algorithms is too many for one strip, so they sit in two labelled rows
+   driven by each entry's `group`. */
+#algoTabs{display:flex;flex-direction:column;gap:7px}
+.algogroup{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.algogroup > .glabel{
+  color:var(--dim2);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;
+  width:74px;flex:none;text-align:right;
+}
+.pillrow{display:flex;gap:7px;flex-wrap:wrap;min-width:0}
+.pill{
+  position:relative;border:1px solid var(--line);background:rgba(255,255,255,.022);
+  color:var(--dim);padding:8px 15px;border-radius:11px;cursor:pointer;
+  font-size:12.5px;font-weight:550;transition:.18s;overflow:hidden;letter-spacing:.005em;
+}
+.pill span.k{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;opacity:.45;margin-right:7px}
+.pill:hover{color:var(--text);border-color:var(--line2);transform:translateY(-1px)}
+.pill.on{color:#fff;border-color:transparent;background:linear-gradient(140deg,rgba(99,102,241,.42),rgba(34,211,238,.24));box-shadow:0 6px 22px -8px rgba(99,102,241,.85),0 0 0 1px rgba(165,180,252,.28) inset}
+.pill.on span.k{opacity:.7}
+.pill[disabled]{
+  opacity:.34;cursor:not-allowed;background:repeating-linear-gradient(
+    -45deg,rgba(255,255,255,.02) 0 5px,transparent 5px 10px);
+}
+.pill[disabled]:hover{color:var(--dim);border-color:var(--line);transform:none}
+
+/* ---------- main ---------- */
+main{flex:1;min-height:0;display:flex;gap:12px}
+#worldHost{
+  flex:1;min-width:0;min-height:0;position:relative;overflow:hidden;
+  border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.015);
+}
+#worldHost::after{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:16px;z-index:5;
+  box-shadow:0 0 90px -30px rgba(99,102,241,.5) inset;
+}
+/* One world visible at a time, full width. Every world gets its own wrapper so
+   toggling is a display flip and nothing has to be torn down. */
+.world{
+  position:absolute;inset:0;display:none;
+  align-items:center;justify-content:center;overflow:hidden;
+}
+.world.on{display:flex}
+
+/* ---------- side ---------- */
+aside{
+  width:352px;flex:none;display:flex;flex-direction:column;gap:10px;min-height:0;
+}
+.card{
+  border:1px solid var(--line);border-radius:14px;background:var(--panel);
+  padding:14px;backdrop-filter:blur(10px);
+}
+.card h2{
+  font-size:12.5px;font-weight:650;letter-spacing:-.01em;margin-bottom:6px;display:flex;align-items:center;gap:8px;
+}
+.dot{width:7px;height:7px;border-radius:99px;background:var(--frontier);box-shadow:0 0 10px var(--frontier);flex:none}
+#algoDesc{color:var(--dim);line-height:1.55;font-size:12px}
+.props{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+.props dt{color:var(--dim2);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.props dd{font-size:11.5px;color:var(--text)}
+.props dd.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;color:#a5b4fc}
+.yes{color:#34d399}.no{color:#fb7185}.maybe{color:#fbbf24}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.stat{background:#0c0f16;padding:10px 11px}
+.stat b{display:block;font-size:18px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat i{display:block;font-style:normal;color:var(--dim2);font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;margin-top:3px}
+.stat.s-exp b{color:#a5b4fc}
+.stat.s-fro b{color:#67e8f9}
+.stat.s-cost b{color:#fbbf24}
+#stStatus{font-size:12.5px;font-weight:600}
+
+.tabbed{flex:1;min-height:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+.tabbar{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--line)}
+.tabbar button{
+  border:0;background:transparent;color:var(--dim2);padding:7px 12px;border-radius:8px 8px 0 0;
+  cursor:pointer;font-size:11.5px;font-weight:550;position:relative;transition:.15s;
+}
+.tabbar button:hover{color:var(--text)}
+.tabbar button.on{color:#fff;background:rgba(255,255,255,.05)}
+.tabbar button.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px;background:linear-gradient(90deg,#818cf8,#22d3ee)}
+.pane{display:none;flex:1;min-height:0;overflow:auto;padding:11px 12px}
+.pane.on{display:block}
+
+#frontierHead{color:var(--dim2);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px}
+.frow{
+  display:flex;align-items:center;gap:8px;padding:4px 7px;border-radius:7px;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;cursor:default;
+  border:1px solid transparent;
+}
+.frow:hover{background:rgba(255,255,255,.055);border-color:var(--line)}
+.frow .n{color:var(--dim2);width:22px;text-align:right;flex:none}
+.frow .c{color:#67e8f9;width:78px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .kv{color:var(--dim);display:flex;gap:9px;min-width:0}
+.frow .kv b{color:#fbbf24;font-weight:600}
+.frow.next{background:rgba(34,211,238,.10);border-color:rgba(34,211,238,.32)}
+.frow.next .n{color:#67e8f9}
+.more{color:var(--dim2);font-size:11px;padding:6px 7px}
+
+#logList{display:flex;flex-direction:column;gap:1px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px}
+.lrow{padding:3px 6px;border-radius:6px;color:var(--dim);display:flex;gap:8px;line-height:1.45}
+.lrow .t{flex:none;font-weight:600;width:56px}
+.lrow.expand .t{color:#a5b4fc}
+.lrow.push .t{color:#67e8f9}
+.lrow.skip{opacity:.55}
+.lrow.skip .t{color:var(--dim2)}
+.lrow.cut .t{color:#fb7185}
+.lrow.info .t{color:#c084fc}
+.lrow.info{background:rgba(192,132,252,.09)}
+.lrow.goal{background:rgba(251,191,36,.12);color:#fde68a}
+.lrow.goal .t{color:#fbbf24}
+.lrow.fail{background:rgba(244,63,94,.12);color:#fecdd3}
+.lrow.fail .t{color:#fb7185}
+
+pre#codeBlock{
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;line-height:1.72;
+  color:#cdd4e6;white-space:pre;
+}
+#codeBlock .kw{color:#c084fc}
+#codeBlock .fn{color:#67e8f9}
+#codeBlock .op{color:#fbbf24}
+#codeBlock .cm{color:var(--dim2);font-style:italic}
+
+/* ---------- controls ---------- */
+footer{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:10px 12px;
+  backdrop-filter:blur(10px);
+}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);
+  background:rgba(255,255,255,.035);border-radius:10px;padding:8px 13px;cursor:pointer;
+  font-size:12px;font-weight:550;transition:.16s;white-space:nowrap;
+}
+.btn:hover{background:rgba(255,255,255,.08);border-color:var(--line2);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn svg{width:13px;height:13px;fill:currentColor;flex:none}
+.btn.primary{
+  border-color:transparent;color:#03121a;font-weight:650;
+  background:linear-gradient(140deg,#67e8f9,#818cf8);
+  box-shadow:0 6px 20px -8px rgba(103,232,249,.9);
+}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.divider{width:1px;height:24px;background:var(--line);flex:none}
+.divider.off{display:none}
+
+.ctl{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--dim)}
+.ctl label{color:var(--dim2);text-transform:uppercase;letter-spacing:.07em;font-size:10px}
+.ctl output{font-family:ui-monospace,"SF Mono",Menlo,monospace;color:var(--text);font-size:11px;min-width:56px}
+.ctl.off{display:none}
+/* A convention switch plus the one line that says what it means. */
+.ctl.stack{flex-direction:column;align-items:flex-start;gap:3px}
+.ctl.stack .row{display:flex;align-items:center;gap:9px}
+.ctl .note{
+  color:var(--dim2);font-size:9.5px;line-height:1.35;max-width:300px;letter-spacing:.005em;
+  min-height:26px;      /* two lines, so switching the text never reflows the board */
+}
+
+select{
+  border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:9px;
+  padding:6px 9px;font-size:11.5px;cursor:pointer;outline:none;max-width:190px;
+}
+select:hover{border-color:var(--line2)}
+select option{background:#12161f;color:var(--text)}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:118px;height:4px;border-radius:99px;background:rgba(255,255,255,.14);outline:none}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:99px;cursor:pointer;
+  background:linear-gradient(140deg,#a5b4fc,#67e8f9);box-shadow:0 0 0 3px rgba(103,232,249,.16);
+}
+#limitWrap{transition:opacity .2s}
+
+.switch{display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:11.5px;color:var(--dim)}
+.switch input{display:none}
+.switch .track{width:30px;height:17px;border-radius:99px;background:rgba(255,255,255,.13);position:relative;transition:.18s;flex:none}
+.switch .track::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:99px;background:#fff;transition:.18s}
+.switch input:checked + .track{background:linear-gradient(120deg,#818cf8,#22d3ee)}
+.switch input:checked + .track::after{transform:translateX(13px)}
+
+#terrainWrap,#showGWrap{display:inline-flex;align-items:center;gap:10px}
+#terrainWrap.off,#showGWrap.off{display:none}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:10.5px;color:var(--dim2)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.legend span.off{display:none}
+
+.hint{color:var(--dim2);font-size:10.5px}
+kbd{
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;padding:1px 5px;border-radius:5px;
+  border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--dim);
+}
+
+/* ---------- race ---------- */
+#raceArea{flex:1;min-width:0;min-height:0;display:none;flex-direction:column;gap:10px;overflow:auto;padding-right:2px}
+#raceGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}
+.rcard{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:11px;position:relative;overflow:hidden;transition:.2s}
+.rcard.winner{border-color:rgba(251,191,36,.5);box-shadow:0 0 26px -10px rgba(251,191,36,.75)}
+.rcard header{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.rcard h3{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
+.rcard .badge{
+  margin-left:auto;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;
+  padding:3px 8px;border-radius:99px;border:1px solid var(--line);color:var(--dim2);
+}
+.rcard .badge.run{color:#67e8f9;border-color:rgba(34,211,238,.35);background:rgba(34,211,238,.09)}
+.rcard .badge.ok{color:#fbbf24;border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.1)}
+.rcard .badge.bad{color:#fb7185;border-color:rgba(244,63,94,.35);background:rgba(244,63,94,.1)}
+.rcard canvas{display:block;width:100%;border-radius:8px;background:#0a0d13;image-rendering:pixelated}
+.rstats{display:flex;gap:14px;margin-top:9px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10.5px;color:var(--dim2)}
+.rstats b{color:var(--text);font-weight:600}
+.rbar{height:2px;border-radius:2px;background:rgba(255,255,255,.07);margin-top:8px;overflow:hidden}
+.rbar span{display:block;height:100%;width:0;background:linear-gradient(90deg,#818cf8,#22d3ee);transition:width .12s linear}
+
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.11);border-radius:99px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2);background-clip:padding-box}
+
+@media (max-width:1080px){
+  aside{width:300px}
+  .brand small{display:none}
+  .algogroup > .glabel{width:auto;text-align:left}
+}
+@media (max-width:880px){
+  body{overflow:auto}
+  #app{height:auto;min-height:100vh}
+  main{flex-direction:column}
+  aside{width:auto}
+  #worldHost{min-height:56vh;flex:none}
+}
+/* Short viewports: two rows of pills plus a wrapping footer leave nothing for the
+   board and the panel. Stop cramming and let the page scroll instead. */
+@media (min-width:881px) and (max-height:800px){
+  body{overflow:auto}
+  #app{height:auto;min-height:100vh}
+  #worldHost{height:min(58vh,520px);min-height:320px}   /* main is a row here: leave flex alone, it sets the width */
+  aside .tabbed{flex:none;height:300px}
+}
