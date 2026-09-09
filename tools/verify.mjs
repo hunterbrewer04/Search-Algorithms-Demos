@@ -71,17 +71,20 @@ let checks = 0;
 const failures = [];
 const rows = [];
 
+let currentSection = '';
 function ok(cond, msg, detail){
   checks++;
-  if (!cond) failures.push(detail ? `${msg}\n        ${detail}` : msg);
+  if (!cond) failures.push({ section: currentSection, text: detail ? `${msg}\n        ${detail}` : msg });
   return !!cond;
 }
 const near = (a, b) => Math.abs(a - b) < 1e-9;
 
 function section(name, cases, fn){
   const c0 = checks, f0 = failures.length;
+  currentSection = name;
   try { fn(); }
-  catch (e){ failures.push(`${name}: threw — ${e && e.stack ? e.stack : e}`); }
+  catch (e){ failures.push({ section: name, text: `${name}: threw — ${e && e.stack ? e.stack : e}` }); }
+  currentSection = '';
   rows.push({ name, cases: typeof cases === 'function' ? cases() : cases,
               checks: checks - c0, failed: failures.length - f0 });
 }
@@ -747,6 +750,55 @@ section('depth limits', have('dls') ? 60 : 0, () => {
   }
 });
 
+section('dls depth trap', have('dls') ? 1 : 0, () => {
+  if (!have('dls')) return;
+  // A named minimal case for the same defect, so a regression reports one
+  // readable failure instead of a scatter of random ones.
+  //
+  //   S -L1- L2 -- M        M first reached at depth 3 down the long branch
+  //   S -A-------- M        and at depth 2 down the short one
+  //                M -- G   goal sits one step past M
+  //
+  // At L = 3 the long branch reaches M at exactly the limit, so M is expanded
+  // and cut off without generating G. A seen-once explored set then discards
+  // the depth-2 arrival and the search reports cutoff, even though G is at
+  // depth 3. Order-sensitive by construction, so the liveness assertion below
+  // fails loudly if the successor convention ever changes, rather than letting
+  // the case pass for the wrong reason.
+  const trap = {
+    id:'dlstrap', name:'dls trap', undirected:true,
+    nodes:[{id:'S',x:0,y:0},{id:'L1',x:.2,y:.5},{id:'L2',x:.4,y:.5},
+           {id:'M',x:.6,y:.2},{id:'A',x:.3,y:0},{id:'G',x:.9,y:.2}],
+    edges:[{a:'S',b:'L1',cost:1},{a:'L1',b:'L2',cost:1},{a:'L2',b:'M',cost:1},
+           {a:'S',b:'A',cost:1},{a:'A',b:'M',cost:1},{a:'M',b:'G',cost:1}],
+    start:'S', goal:'G', hScale:1
+  };
+  const tp = SAD.graphProblem(trap);
+  ok(fewestEdges(tp) === 3, 'dls trap: goal should sit at depth 3', `got ${fewestEdges(tp)}`);
+  const tr = drive(A('dls'), tp, { limit: 3 }, 100000);
+  if (!tr.error){
+    ok(tr.last.kind === 'goal',
+       'dls trap: DLS reported no goal at limit 3 though one sits at depth 3 — depth-blind explored set',
+       `ended on ${tr.last.kind}${tr.last.cutoff ? ' (cutoff)' : ''}`);
+    if (tr.last.kind === 'goal'){
+      const v = walkPath(tp, tr.last.path);
+      ok(!v.error, 'dls trap: invalid path', v.error);
+      ok(tr.last.path.length - 1 === 3, 'dls trap: path should be 3 edges',
+         `got ${tr.last.path.length - 1}`);
+    }
+  } else ok(false, `dls trap: ${tr.error}`);
+
+  // liveness: M really is cut off deep and then re-expanded shallow
+  const seenM = [];
+  for (const st of A('dls').make(tp, { limit: 3 })){
+    if ((st.kind === 'expand' || st.kind === 'cutoff') && st.id === 'M') seenM.push(st.kind + '@' + st.depth);
+    if (st.kind === 'goal' || st.kind === 'fail') break;
+  }
+  ok(seenM.join(',') === 'cutoff@3,expand@2',
+     'dls trap is no longer exercising the deep-then-shallow path — rewire the fixture',
+     `M seen as ${seenM.join(',') || 'never'}`);
+});
+
 /* ---------------------------------------------------------------
    8. iterative deepening
    --------------------------------------------------------------- */
@@ -763,14 +815,20 @@ section('iddfs', have('iddfs') ? 16 : 0, () => {
     cases.push({ where: `iddfs grid #${i}`, p: SAD.gridProblem(m), m });
   }
 
+  // Both search modes. Tree mode keeps no explored set and so passes even with
+  // a depth-blind one underneath; graph mode is where delegation to dls can
+  // cost IDDFS its fewest-edges guarantee. Testing one mode hides the other.
   for (const c of cases){
     const depth = fewestEdges(c.p);
     if (!ok(depth !== null, `${c.where}: unsolvable problem`)) continue;
-    const r = solve(A('iddfs'), c.p, { limit: 1, maxExpansions: 400000 }, c.where, c.m);
-    if (r && r.found)
-      ok(r.len === depth, `${c.where}: IDDFS did not return the fewest-edges path`,
-         `fewest ${depth}, got ${r.len}`);
-    else ok(false, `${c.where}: IDDFS found nothing on a solvable problem`);
+    for (const search of ['graph', 'tree']){
+      const r = solve(A('iddfs'), c.p, { limit: 1, search, maxExpansions: 400000 },
+                      `${c.where} ${search}`, c.m);
+      if (r && r.found)
+        ok(r.len === depth, `${c.where} (${search}): IDDFS did not return the fewest-edges path`,
+           `fewest ${depth}, got ${r.len}`);
+      else ok(false, `${c.where} (${search}): IDDFS found nothing on a solvable problem`);
+    }
   }
 });
 
@@ -943,8 +1001,25 @@ if (notes.length){
 if (failures.length){
   console.log('');
   console.log(`${failures.length} failure${failures.length === 1 ? '' : 's'}:`);
-  for (const f of failures.slice(0, 25)) console.log(`  - ${f}`);
-  if (failures.length > 25) console.log(`  ... and ${failures.length - 25} more`);
+
+  // Lead with the first failure from every section that has one. A section
+  // failing in bulk would otherwise fill the whole list and hide a named
+  // diagnostic case in a later section, which is exactly when you need it.
+  const LIMIT = 25;
+  const firsts = new Map();
+  for (const f of failures) if (!firsts.has(f.section)) firsts.set(f.section, f);
+  const shown = new Set();
+  if (firsts.size > 1){
+    for (const f of firsts.values()){ console.log(`  [${f.section}] ${f.text}`); shown.add(f); }
+    console.log('');
+  }
+  let n = shown.size;
+  for (const f of failures){
+    if (shown.has(f) || n >= LIMIT) continue;
+    console.log(`  - ${f.text}`);
+    n++;
+  }
+  if (failures.length > n) console.log(`  ... and ${failures.length - n} more`);
   console.log('');
   console.log('FAIL');
   process.exit(1);
