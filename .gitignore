@@ -1,0 +1,29 @@
+# OS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Tooling / agents
+.claude/
+node_modules/
+*.log
+
+# Working notes, plans, handoffs, scratch output (never committed)
+handoff.md
+HANDOFF.md
+plan.md
+PLAN.md
+notes.md
+NOTES.md
+memory/
+scratch/
+tmp/
+/tools/out/
