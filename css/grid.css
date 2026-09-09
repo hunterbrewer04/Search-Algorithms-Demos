@@ -72,3 +72,10 @@
 }
 @keyframes goalPulse{0%,100%{opacity:1}50%{opacity:.45}}
 .cell.start .lbl,.cell.goal .lbl{display:none}
+
+/* Reduced motion: keep the state colours, drop the movement. */
+@media (prefers-reduced-motion: reduce){
+  .cell,.cell.wall,.cell.frontier,.cell.visited,.cell.cutoff,.cell.path{animation:none}
+  .cell.goal::after{animation:none}
+  #pathLine{filter:none}
+}

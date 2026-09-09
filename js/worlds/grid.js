@@ -17,7 +17,7 @@
   const rowOf  = i => (i / m.cols) | 0;
   const isWall = i => !!m.wall[i];
   const costOf = i => m.cost[i];
-  const HEAVY  = () => (SAD.GridModel && SAD.GridModel.HEAVY) || 5;
+  const HEAVY  = () => SAD.HEAVY;
 
   let host = null, board = null, overlay = null, pathLine = null;
   let cells = [];
@@ -58,18 +58,31 @@
     clearSearch();
   }
 
+  /* Cells get BIGGER on a phone, not smaller: drawing walls with a fingertip
+     wants fewer, larger cells. The minimums shrink to match, so a narrow screen
+     ends up with a coarse board rather than an unusable one. */
+  function metrics(){
+    const w = window.innerWidth;
+    if (w < 720)  return { cs:28, minCols:9,  minRows:7,  maxCols:26, maxRows:34 };
+    if (w < 1024) return { cs:24, minCols:12, minRows:8,  maxCols:40, maxRows:44 };
+    return              { cs:22, minCols:12, minRows:8,  maxCols:64, maxRows:48 };
+  }
+
   function layout(){
     if (!host) return;
     const box = host.getBoundingClientRect();
     if (box.width < 2 || box.height < 2) return;   // hidden world, nothing to measure
-    cs = window.innerWidth < 900 ? 16 : 22;
+    const M = metrics();
+    cs = M.cs;
     document.documentElement.style.setProperty('--cs', cs + 'px');
-    const cols = Math.max(12, Math.min(64, Math.floor((box.width  - 18 + GAP) / (cs + GAP))));
-    const rows = Math.max(8,  Math.min(48, Math.floor((box.height - 18 + GAP) / (cs + GAP))));
+    const cols = Math.max(M.minCols, Math.min(M.maxCols, Math.floor((box.width  - 18 + GAP) / (cs + GAP))));
+    const rows = Math.max(M.minRows, Math.min(M.maxRows, Math.floor((box.height - 18 + GAP) / (cs + GAP))));
     if (cols !== m.cols || rows !== m.rows){
       m.resize(cols, rows);
       buildCells();
       repaintAll();
+      // The board changed shape, so any run in flight is against a stale problem.
+      SAD.worldChanged();
     }
   }
 
@@ -179,28 +192,40 @@
   /* =========================================================
      Solution path
      ========================================================= */
+  const reduceMotion = () =>
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   function showPath(path){
     if (!path || !path.length) return;
     const usable = path.filter(valid);
     if (usable.length !== path.length) return;    // path belongs to another world
+    const still = reduceMotion();
 
     usable.forEach((id, k) => {
       stateArr[id] = S_PATH;
       const el = cells[id];
-      el.style.animationDelay = (k * 20) + 'ms';
+      if (!still){
+        el.style.animationDelay = (k * 20) + 'ms';
+        setTimeout(() => { el.style.animationDelay = ''; }, k * 20 + 600);
+      }
       paint(id);
-      setTimeout(() => { el.style.animationDelay = ''; }, k * 20 + 600);
     });
 
     const step = cs + GAP, half = cs / 2;
     const d = usable.map((id, k) =>
       `${k === 0 ? 'M' : 'L'}${(colOf(id) * step + half).toFixed(1)} ${(rowOf(id) * step + half).toFixed(1)}`).join(' ');
     pathLine.setAttribute('d', d);
+    pathLine.style.opacity = 1;
+    if (still){
+      pathLine.style.transition = 'none';
+      pathLine.style.strokeDasharray = '';
+      pathLine.style.strokeDashoffset = 0;
+      return;
+    }
     const len = pathLine.getTotalLength();
     pathLine.style.transition = 'none';
     pathLine.style.strokeDasharray = len;
     pathLine.style.strokeDashoffset = len;
-    pathLine.style.opacity = 1;
     requestAnimationFrame(() => {
       const ms = Math.min(1400, Math.max(320, usable.length * 26));
       pathLine.style.transition = `stroke-dashoffset ${ms}ms cubic-bezier(.3,.7,.3,1)`;
@@ -225,7 +250,8 @@
     board.addEventListener('pointerdown', e => {
       const i = cellFrom(e); if (i < 0) return;
       e.preventDefault();
-      board.setPointerCapture(e.pointerId);
+      // Safari throws if the pointer is already gone; capture is an optimisation.
+      try { board.setPointerCapture(e.pointerId); } catch (_) {}
       if (i === m.start) drag = { t:'start' };
       else if (i === m.goal) drag = { t:'goal' };
       else if (e.shiftKey || e.button === 2 || e.altKey)

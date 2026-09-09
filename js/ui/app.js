@@ -289,6 +289,7 @@
     $('terrainWrap').classList.toggle('off', !hasTerrain);
     $('terrainDiv').classList.toggle('off', !hasTerrain);
     $('showGWrap').classList.toggle('off', !hasShowG);
+    $('showGDiv').classList.toggle('off', !hasShowG);
     $('presetWrap').classList.toggle('off', !hasPresets);
     $('presetDiv').classList.toggle('off', !hasPresets);
     $('modeTabs').classList.toggle('off', !w.supportsRace);
@@ -300,21 +301,10 @@
      ========================================================= */
   const GROUPS = [['uninformed', 'Uninformed'], ['informed', 'Informed']];
 
-  /* The picker order the contract asks for. It is not the order the algorithms
-     register in — the two extras register from a file that loads last — so the
-     picker sorts by this instead. Anything unrecognised keeps its registration
-     order and lands at the end. The number keys follow this order too. */
-  const PICKER_ORDER = ['bfs', 'dfs', 'dls', 'iddfs', 'ucs', 'greedy', 'astar', 'bidirectional'];
-
-  function orderedAlgos(){
-    const list = SAD.algorithms || [];
-    const rank = new Map();
-    list.forEach((e, i) => {
-      const k = PICKER_ORDER.indexOf(e.id);
-      rank.set(e, k < 0 ? PICKER_ORDER.length + i : k);
-    });
-    return list.slice().sort((a, b) => rank.get(a) - rank.get(b));
-  }
+  /* Entries carry an explicit `order` and SAD.registerAlgorithm keeps
+     SAD.algorithms sorted by it, so the array is already the picker order.
+     Render it as-is: never re-sort, never hardcode a list of ids. */
+  const algoList = () => SAD.algorithms || [];
 
   function disabledReason(e){
     if (!e) return null;
@@ -326,7 +316,7 @@
   function buildAlgoTabs(){
     const host = $('algoTabs');
     host.replaceChildren();
-    const list = orderedAlgos();
+    const list = algoList();
 
     for (const [group, title] of GROUPS){
       const inGroup = list.filter(e => e.group === group);
@@ -365,7 +355,9 @@
     for (const b of $('algoTabs').querySelectorAll('.pill'))
       b.classList.toggle('on', b.dataset.k === id);
     SAD.panels.setAlgorithm(e);
-    $('limitWrap').classList.toggle('off', !(e.supports && e.supports.limit));
+    const wantsLimit = !!(e.supports && e.supports.limit);
+    $('limitWrap').classList.toggle('off', !wantsLimit);
+    $('limitDiv').classList.toggle('off', !wantsLimit);
     if (UI.mode === 'race') resetRace(); else resetRun();
   }
 
@@ -390,25 +382,35 @@
   /* =========================================================
      Graph presets
      ========================================================= */
+  const graphWorld = () => (SAD.worldOf ? SAD.worldOf('graph') : null);
+
   function buildPresets(){
     const sel = $('presetSelect');
     sel.replaceChildren();
-    (SAD.graphPresets || []).forEach((p, i) => {
+    for (const p of SAD.graphPresets || []){
       const o = document.createElement('option');
-      o.value = i;
+      o.value = p.id;
       o.textContent = p.name + (p.admissible === false ? '  (broken h)' : '');
       sel.appendChild(o);
-    });
-    sel.onchange = () => choosePreset(+sel.value);
-    if ((SAD.graphPresets || []).length) choosePreset(0, true);
+    }
+    sel.onchange = () => choosePreset(sel.value);
+    syncPresetSelect();
   }
 
-  function choosePreset(i, quiet){
-    const p = (SAD.graphPresets || [])[i];
-    if (!p) return;
-    SAD.activePreset = p;
-    for (const w of worlds()) if (typeof w.setPreset === 'function') w.setPreset(p, i);
-    if (!quiet){ SAD.worldChanged(); buildAlgoTabs(); }
+  /* Show whichever preset the graph world already has loaded, rather than
+     forcing one on it at boot. */
+  function syncPresetSelect(){
+    const w = graphWorld();
+    if (!w || typeof w.model !== 'function') return;
+    const model = w.model();
+    if (model && model.id) $('presetSelect').value = model.id;
+  }
+
+  function choosePreset(id){
+    const w = graphWorld();
+    if (!w || typeof w.setPreset !== 'function') return;
+    w.setPreset(id);          // the graph world calls SAD.worldChanged() itself
+    buildAlgoTabs();          // a directed preset can disable bidirectional
   }
 
   /* =========================================================
@@ -418,7 +420,7 @@
   const RC = { empty:'#161a25', wall:'#04060b', heavy:'#2a2313', frontier:'#22d3ee',
                visited:'#4b4f96', cutoff:'#7a3540', path:'#fbbf24', start:'#10b981', goal:'#f43f5e' };
 
-  function racers(){ return orderedAlgos().filter(e => !disabledReason(e)); }
+  function racers(){ return algoList().filter(e => !disabledReason(e)); }
 
   function buildRace(){
     const grid = $('raceGrid');
@@ -578,6 +580,84 @@
   }
 
   /* =========================================================
+     Phone sheets
+     ========================================================= */
+  const isPhone = () => window.matchMedia('(max-width:719px)').matches;
+
+  /* Touch sizing keys off a class, not a media query alone, so a hybrid laptop
+     and an iPad in landscape both get 44px targets and the Options sheet. The
+     markup ships with it on, so a stalled script fails toward finger-friendly. */
+  function syncTouchClass(){
+    const coarse = (window.matchMedia && window.matchMedia('(pointer:coarse)').matches)
+      || (navigator.maxTouchPoints || 0) > 0;
+    document.body.classList.toggle('touch', coarse || window.innerWidth < 1024);
+  }
+
+  /* The bottom bar and the collapsed panel strip are both laid out from
+     measured heights, because both depend on how the footer wrapped. */
+  function measureChrome(){
+    const root = document.documentElement;
+    root.style.setProperty('--barH', Math.ceil($('bar').getBoundingClientRect().height) + 'px');
+    if (isPhone()){
+      const h = $('panelHandle').getBoundingClientRect().height;
+      const st = $('panel').querySelector('.stats').getBoundingClientRect().height;
+      root.style.setProperty('--collapsedH', Math.ceil(h + st + 8) + 'px');
+    } else {
+      root.style.removeProperty('--collapsedH');
+    }
+  }
+
+  function collapsedPx(){
+    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--collapsedH')) || 0;
+  }
+
+  function setPanelOpen(on){
+    document.body.classList.toggle('panel-open', !!on);
+    const h = $('panelHandle');
+    h.setAttribute('aria-expanded', on ? 'true' : 'false');
+    h.setAttribute('aria-label', on ? 'Collapse panel' : 'Expand panel');
+  }
+
+  function setOptsOpen(on){
+    document.body.classList.toggle('opts-open', !!on);
+    $('btnOptions').setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
+
+  /* Tap the handle to toggle, or drag it and let it settle to the nearer end. */
+  function wireSheets(){
+    const handle = $('panelHandle'), panel = $('panel');
+    let y0 = null, wasOpen = false, moved = 0;
+
+    handle.addEventListener('pointerdown', e => {
+      if (!isPhone()) return;
+      handle.setPointerCapture(e.pointerId);
+      y0 = e.clientY; moved = 0;
+      wasOpen = document.body.classList.contains('panel-open');
+      document.body.classList.add('panel-dragging');
+    });
+    handle.addEventListener('pointermove', e => {
+      if (y0 == null) return;
+      moved = e.clientY - y0;
+      const hidden = Math.max(0, panel.offsetHeight - collapsedPx());
+      const y = Math.max(0, Math.min(hidden, (wasOpen ? 0 : hidden) + moved));
+      panel.style.transform = `translateY(${y}px)`;
+    });
+    const end = () => {
+      if (y0 == null) return;
+      y0 = null;
+      document.body.classList.remove('panel-dragging');
+      panel.style.transform = '';
+      setPanelOpen(Math.abs(moved) < 6 ? !wasOpen : moved < 0);
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+
+    $('btnOptions').onclick = () => setOptsOpen(!document.body.classList.contains('opts-open'));
+    $('btnOptionsClose').onclick = () => setOptsOpen(false);
+    $('scrim').onclick = () => setOptsOpen(false);
+  }
+
+  /* =========================================================
      Transport
      ========================================================= */
   function setPlayLabel(){
@@ -610,6 +690,8 @@
     $('worldHost').style.display = m === 'explore' ? '' : 'none';
     $('raceArea').style.display  = m === 'race' ? 'flex' : 'none';
     $('algoTabs').style.display  = m === 'explore' ? 'flex' : 'none';
+    setOptsOpen(false);
+    measureChrome();
     if (m === 'race'){ sim.playing = false; buildRace(); }
     else { race.playing = false; activeWorld().resize(); }
     setPlayLabel();
@@ -669,6 +751,7 @@
 
     window.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'Escape'){ setOptsOpen(false); setPanelOpen(false); return; }
       if (e.code === 'Space'){ e.preventDefault(); togglePlay(); }
       else if (e.key === 's'){ $('btnStep').click(); }
       else if (e.key === 'r'){ $('btnReset').click(); }
@@ -676,19 +759,23 @@
       else if (e.key === 'c'){ $('btnClear').click(); }
       else if (e.key >= '1' && e.key <= '8'){
         if (UI.mode !== 'explore') return;
-        const pick = orderedAlgos()[+e.key - 1];
+        const pick = algoList()[+e.key - 1];
         if (pick && !disabledReason(pick)) selectAlgo(pick.id);
       }
     });
 
     let rt = 0;
-    window.addEventListener('resize', () => {
+    const relayout = () => {
       clearTimeout(rt);
       rt = setTimeout(() => {
+        syncTouchClass();
+        measureChrome();
         if (UI.mode === 'explore') activeWorld().resize();
         else { sizeRace(); race.entries.forEach(redrawRace); }
       }, 140);
-    });
+    };
+    window.addEventListener('resize', relayout);
+    window.addEventListener('orientationchange', relayout);
   }
 
   /* A world calls this when the USER edits it: the board changed under the
@@ -714,7 +801,7 @@
     buildWorldTabs();
     mountWorlds();
 
-    const list = SAD.algorithms || [];
+    const list = algoList();
     UI.algo = (SAD.algorithmById('astar') ? 'astar' : (list[0] && list[0].id)) || null;
 
     setWorld(worlds()[0].id);
@@ -722,9 +809,12 @@
     buildAlgoTabs();
     if (UI.algo) selectAlgo(UI.algo);
 
+    syncTouchClass();
     wireControls();
+    wireSheets();
     $('speedVal').textContent = speedFor(UI.speed) + '/s';
     $('limitVal').textContent = UI.limit;
+    measureChrome();
     activeWorld().resize();
     requestAnimationFrame(frame);
   }
