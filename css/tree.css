@@ -54,18 +54,30 @@
 .world-tree .tmore.on{display:inline-block}
 .world-tree .thint{color:var(--dim2);font-size:10.5px}
 .world-tree .tfit{
+  /* 44x44 minimum touch target, per the responsive acceptance test */
+  min-width:44px;min-height:44px;
+  display:inline-flex;align-items:center;justify-content:center;
   border:1px solid var(--line);
   background:rgba(255,255,255,.035);
-  border-radius:9px;padding:5px 12px;cursor:pointer;
+  border-radius:11px;padding:0 14px;cursor:pointer;
   font-size:11.5px;font-weight:550;transition:.16s;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
 }
 .world-tree .tfit:hover{background:rgba(255,255,255,.08);border-color:var(--line)}
+.world-tree .tfit.on{
+  color:#67e8f9;
+  border-color:rgba(34,211,238,.4);
+  background:rgba(34,211,238,.10);
+}
 
 /* ---------- stage ---------- */
 .world-tree .tstage{
   position:relative;
   flex:1;min-width:0;
-  min-height:320px;
+  min-height:220px;
+  touch-action:none;
+  overscroll-behavior:contain;
   border:1px solid var(--line);
   border-radius:14px;
   background:rgba(255,255,255,.014);
@@ -207,7 +219,25 @@
   letter-spacing:.02em;
 }
 
+/* ---------- small screens ---------- */
 @media (max-width:880px){
-  .world-tree{height:auto;min-height:56vh}
   .world-tree .thint{display:none}
+}
+@media (max-width:719px){
+  .world-tree{padding:8px;gap:6px}
+  .world-tree .tcount{display:none}
+  .world-tree .tstage{border-radius:12px}
+  /* the label shrinks but never below readable, since the cut line is the
+     one thing this view exists to show */
+  .world-tree .tcutlbl{font-size:10px}
+  .world-tree .tnode .tlbl{font-size:10px}
+  .world-tree .tnode .tval{font-size:9px}
+}
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  .world-tree .tnode,
+  .world-tree .tnode .tbox{animation:none !important}
+  .world-tree .tnode .tbox{transition:none}
+  .world-tree .tfit{transition:none}
 }

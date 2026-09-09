@@ -119,6 +119,7 @@
 
   SAD.registerAlgorithm({
     id: 'iddfs',
+    order: 4,
     name: 'Iterative Deepening DFS',
     short: 'IDDFS',
     group: 'uninformed',
@@ -141,9 +142,17 @@
     # result was CUTOFF: something was still unexplored below L,
     # so throw the tree away and go one level deeper.
 
-DEPTH_LIMITED_SEARCH keeps no explored set across rounds. Each round
-is a fresh tree search that only refuses to revisit a node already on
-the path it is currently walking, which is what keeps memory O(b·L).`,
+return FAILURE
+
+# goalTest = 'gen'   each round hands the test to depth-limited search,
+#                    which tests a child as it is generated, so a round
+#                    can finish one expansion earlier than under 'pop'
+# search   = 'tree'  what iterative deepening assumes anyway: no explored
+#                    set survives a round, only the check against the
+#                    path being walked, which is what keeps memory O(b·L).
+#                    Under 'graph' the round's explored set is depth-
+#                    sensitive — a state met at a strictly shallower depth
+#                    is expanded again — so the shallowest goal survives.`,
     make: (problem, opts) => iddfs(problem, opts)
   });
 
@@ -166,15 +175,20 @@ the path it is currently walking, which is what keeps memory O(b·L).`,
       return;
     }
 
-    /* Backward expansion needs edges pointing INTO a node. Undirected problems
-       hand that back from successors(); directed ones are supposed to provide
-       predecessors(), and if one does not, build the reverse index once. */
+    /* Backward expansion needs the edges pointing INTO a node, and it takes
+       them from predecessors() no matter what `undirected` says. `undirected`
+       promises only that adjacency is symmetric, never that the two directions
+       cost the same. The grid is exactly that case: its step cost is the cost
+       of the cell being ENTERED, so cost(a->b) = cost[b] while cost(b->a) =
+       cost[a]. Pricing the backward search with successors() gives wrong path
+       costs on every weighted grid while still looking right on a unit-cost
+       graph, which is what makes it such a quiet bug. */
     let predsOf;
-    if (problem.undirected) {
-      predsOf = n => problem.successors(n).map(e => ({ id: e.to, cost: e.cost }));
-    } else if (typeof problem.predecessors === 'function') {
+    if (typeof problem.predecessors === 'function') {
       predsOf = n => problem.predecessors(n).map(e => ({ id: e.from, cost: e.cost }));
     } else {
+      /* Every problem the app ships supplies predecessors(). This is only so a
+         hand-rolled one cannot crash the search. */
       const rev = new Map();
       for (const n of allNodes) {
         for (const e of problem.successors(n)) {
@@ -361,10 +375,11 @@ the path it is currently walking, which is what keeps memory O(b·L).`,
 
   SAD.registerAlgorithm({
     id: 'bidirectional',
+    order: 8,
     name: 'Bidirectional Search',
     short: 'Bi-dir',
-    group: 'uninformed',
-    desc: 'Two searches run at once, one forward from the start and one backward from the goal, taking turns. Two trees of depth d/2 hold far fewer nodes than one tree of depth d, and that is the whole speedup. The subtle part is when to stop. The first node both searches touch is usually not on the cheapest path, so this keeps going until the cheapest key left in each frontier can no longer add up to anything better than the best meeting it has already found. Searching backward needs the edges pointing into a node, which is why it is offered only on undirected problems.',
+    group: 'informed',
+    desc: 'Two searches run at once, one forward from the start and one backward from the goal, taking turns. Two trees of depth d/2 hold far fewer nodes than one tree of depth d, and that is the whole speedup. The subtle part is when to stop. The first node both searches touch is usually not on the cheapest path, so this keeps going until the cheapest key left in each frontier can no longer add up to anything better than the best meeting it has already found. Searching backward needs the edges pointing into a node rather than out of it, which is why it is offered only on problems whose adjacency is symmetric — and why it prices those edges with predecessors(), since symmetric adjacency does not mean symmetric cost.',
     complete: ['yes', 'Yes, when both directions can be searched'],
     optimal: ['yes', 'Yes — it does not stop at the first meeting'],
     time: 'O(b^(d/2))',
@@ -399,7 +414,15 @@ while forward and backward are not both empty:
                 best ← MIN(best, new_g + g_other(neighbour))
 
 if meet is none: return FAILURE
-return PATH(START → meet) + PATH(meet → GOAL)`,
+return PATH(START → meet) + PATH(meet → GOAL)
+
+# goalTest = 'gen'   no effect. There is no single goal test to move
+#                    earlier: the run ends when the two frontiers can no
+#                    longer add up to anything better than their best
+#                    meeting, and the goal is just the backward root
+# search   = 'tree'  no effect. Both sides settle each state once, and
+#                    that is what makes the stopping rule sound. Dropping
+#                    it would cost optimality, not just speed`,
     make: (problem, opts) => bidirectional(problem, opts)
   });
 
