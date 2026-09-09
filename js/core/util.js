@@ -36,15 +36,10 @@
   SAD.HEAVY = 5;
 
   /* Picker order. Files register in whatever order the page loads them, so the
-     list is kept sorted by entry.order instead of by arrival. An entry with no
-     order falls back to its slot in the canonical list, and anything unknown
-     goes last. */
-  const ALGO_ORDER = ['bfs','dfs','dls','iddfs','ucs','greedy','astar','bidirectional'];
-  const rank = entry => {
-    if (typeof entry.order === 'number') return entry.order;
-    const i = ALGO_ORDER.indexOf(entry.id);
-    return i < 0 ? 999 : i + 1;
-  };
+     list is kept sorted by the order each entry declares for itself. An entry
+     with no order sorts last, keeping its arrival position; verify.mjs fails on
+     a missing order rather than letting the picker quietly scramble. */
+  const rank = entry => typeof entry.order === 'number' ? entry.order : Infinity;
 
   SAD.algorithms = SAD.algorithms || [];
   SAD.registerAlgorithm = SAD.registerAlgorithm || function (entry) {

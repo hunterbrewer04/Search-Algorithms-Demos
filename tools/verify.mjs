@@ -814,6 +814,25 @@ section('goalTest / search switches', () => present.length * 4 + 3, () => {
     ok(r.expanded <= 60, `cap ${id}: expanded ${r.expanded} past the cap of 60`);
   }
 
+  // the app passes `limit` in opts on every run, so anything that is not
+  // depth-limited has to ignore it completely
+  const lim = openGrid(20, 14);
+  lim.randomWalls();
+  const lp = SAD.gridProblem(lim);
+  const deep = fewestEdges(lp);
+  ok(deep !== null && deep > 3, 'limit-ignored board is degenerate');
+  for (const id of ['bfs','dfs','ucs','greedy','astar']){
+    if (!have(id)) continue;
+    const free = drive(A(id), lp, {});
+    const capped = drive(A(id), lp, { limit: 3 });
+    if (free.error || capped.error){ ok(false, `limit-ignored ${id}: ${free.error || capped.error}`); continue; }
+    ok(free.found === capped.found && free.expanded === capped.expanded,
+       `${id} must ignore opts.limit`,
+       `without ${free.found}/${free.expanded} expanded, with limit 3 ${capped.found}/${capped.expanded}`);
+    if (free.found && capped.found)
+      ok(near(free.last.g, capped.last.g), `${id} changed its answer when given opts.limit`);
+  }
+
   // goalTest 'gen' really does cost UCS and A* their optimality
   const trap = {
     id: 'trap', name: 'trap', undirected: true,
