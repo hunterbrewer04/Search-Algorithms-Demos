@@ -1,5 +1,11 @@
 /* Search-tree world. Tokens come from css/base.css and are never redefined here. */
 
+/* The world wrapper (.world.world-tree) also matches .world-tree, and this
+   file loads after base.css, so the display:flex below would otherwise keep
+   the tree's bar and empty message showing over the Grid and Graph worlds.
+   Hide the wrapper unless it is the world that is on. */
+.world.world-tree:not(.on){display:none}
+
 .world-tree{
   /* fills #worldHost whether that is a flex container or a sized block */
   position:relative;
